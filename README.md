@@ -78,65 +78,10 @@ Normal users should download:
 
 - **`FS25MapCleaner_Setup.exe`**
 
-Optional:
 
-- **`FS25MapCleaner_Portable.zip`**
 
-## Repository layout
 
-- `fs25_map_cleaner.py` - main app
-- `installer/FS25MapCleaner.iss` - Windows installer script
-- `.github/workflows/build-release.yml` - automatic Windows builds on GitHub
-- `assets/fs25_map_cleaner.ico` - app icon
-- `docs/HOW_IT_WORKS.md` - plain-English explanation of the delete logic
-- `docs/FAQ.md` - common user questions
-- `CHANGELOG.md` - version history
-- `CONTRIBUTING.md` - how to report bugs and suggest changes
 
-## Quick publish on GitHub
 
-1. Create a new GitHub repo named `FS25MapCleaner`
-2. Upload everything from this folder
-3. Push to `main`
-4. Open the **Actions** tab and allow workflows if GitHub asks
-5. Create and push a tag such as `v1.1.0`
-
-```bash
-git tag v1.1.0
-git push origin v1.1.0
-```
-
-GitHub Actions will build:
-
-- `FS25MapCleaner.exe`
-- `FS25MapCleaner_Portable.zip`
-- `FS25MapCleaner_Setup.exe`
-
-Then attach them to the GitHub Release for that tag.
-
-## Suggested GitHub release text
-
-Use this short summary in your releases:
-
-> FS25 Map Cleaner removes a selected map and only the dependency mods that are not used by any other installed map or mod. Shared dependencies are kept automatically.
-
-## Best files to show on your GitHub page
-
-Pin these in the README near the top:
-
-- What the app does
-- Screenshot of the app
-- Big **Download Installer** link
-- Short example of shared dependency checking
-- FAQ
-
-## Local Windows build
-
-If you want to build it yourself on Windows:
-
-- `build_local_exe.bat`
-- `build_local_installer.bat`
-
-## Notes
 
 The app decides what is shared by checking dependency declarations in installed mods. If a mod author did not declare dependencies correctly, the result can only be as accurate as the installed mod metadata.
