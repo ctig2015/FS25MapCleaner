@@ -8,6 +8,10 @@ It is made for people who download large maps that may need a lot of extra mods.
 
 TEST IT OUT AND LEAVE COMMANTS IN https://github.com/ctig2015/FS25MapCleaner/discussions
 
+SCREENSHOTS
+
+<img width="1170" height="770" alt="FS25MapCleaner_IymoZ5PGiA" src="https://github.com/user-attachments/assets/a5fd7f18-ef89-4ddf-a90e-bc40f339d9b4" />
+
 
 
 ## What the app does
