@@ -1,14 +1,14 @@
 # FS25 Map Cleaner
 
-
+!!!IMPORT FARMING SIMULATOR NEED TO BE CLOSED WHEN YOU DO THIS!!
 
 FS25 Map Cleaner is a simple Windows app for **Farming Simulator 25** that helps remove a map and its **unused** required mods.
 
-It is made for people who download large maps that may need a lot of extra mods. When you remove a map, the app checks the map's dependency list and then checks your **other installed mods and maps** before deleting anything extra.
+It is made for people who download maps that may need a lot of extra mods. When you remove a map, the app checks the map's dependency list and then checks your **other installed mods and maps** before deleting anything extra.
 
 TEST IT OUT AND LEAVE COMMANTS IN https://github.com/ctig2015/FS25MapCleaner/discussions
 
-SCREENSHOTS i just used this as an example to see at min it only has the map but it show what mods it shoul have
+SCREENSHOTS i just used this as an example to see at min it only has the map but it show what mods it shoul have once you bro
 
 <img width="1000" height="500" alt="FS25MapCleaner_IymoZ5PGiA" src="https://github.com/user-attachments/assets/a5fd7f18-ef89-4ddf-a90e-bc40f339d9b4" />
 
@@ -26,6 +26,7 @@ When you pick a map and click delete, the app will:
 5. delete the selected map
 6. delete only the extra dependency mods that are **not used anywhere else**
 7. keep anything that another installed map or mod still needs
+8. 
 
 ## Example
 
@@ -39,20 +40,14 @@ When you pick a map and click delete, the app will:
 
 - Download `FS25MapCleaner_Setup.exe`
 - Double-click it
-- Choose where to install it, including another drive or folder if wanted
-- Choose whether to create a desktop icon
-- Finish setup
-- Open the app from the desktop or Start menu
-- Pick the FS25 `mods` folder
-- Scan, choose a map, analyze it, then remove it
+- will show message on first start up but allow and it will open 
+-  browse to the folder where your mods is Scan, choose a map, analyze it, then remove it
 
 No Python install is needed for the end user.
 
 ## Main features
 
 - Simple Windows app
-- Installer with install-location picker
-- Optional desktop shortcut
 - Scans ZIP mods and folder mods
 - Shows probable maps first
 - Lets the user analyze before deleting
