@@ -1,0 +1,40 @@
+FS25 MAP CLEANER - GITHUB SETUP
+
+1. Create a GitHub repository named:
+   FS25MapCleaner
+
+2. Upload all files from this folder to the repo.
+
+3. In the repo description, use this:
+   Remove an FS25 map and only the dependency mods that are not used by any other installed map or mod.
+
+4. In the README, keep the top section focused on:
+   - what the app does
+   - how shared dependency checking works
+   - what file users should download
+
+5. Open the Actions tab and allow workflows if GitHub asks.
+
+6. Create your first tag release:
+   git tag v1.1.0
+   git push origin v1.1.0
+
+7. GitHub Actions will build:
+   - FS25MapCleaner.exe
+   - FS25MapCleaner_Portable.zip
+   - FS25MapCleaner_Setup.exe
+
+8. Tell users to download:
+   FS25MapCleaner_Setup.exe
+
+9. Best GitHub sections to use:
+   - About description
+   - README
+   - Releases
+   - Issues
+
+10. Good release title example:
+    FS25 Map Cleaner v1.1.0
+
+11. Good one-line release summary:
+    Removes a selected FS25 map and only the dependency mods that are not used by any other installed map or mod.

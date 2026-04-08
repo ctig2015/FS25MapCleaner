@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest an improvement for the app
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like added or changed?
+    validations:
+      required: true
+  - type: textarea
+    id: reason
+    attributes:
+      label: Why would this help?
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra notes
+      description: Mockups, screenshots, or workflow examples.

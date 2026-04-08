@@ -1,0 +1,74 @@
+name: Build Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python build tools
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller pillow
+
+      - name: Build standalone EXE
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name FS25MapCleaner --icon assets/fs25_map_cleaner.ico fs25_map_cleaner.py
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Force -Path .\dist\FS25MapCleaner.exe -DestinationPath .\dist\FS25MapCleaner_Portable.zip
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          winget install --id JRSoftware.InnoSetup -e --source winget --accept-package-agreements --accept-source-agreements --silent
+          $paths = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe not found after Inno Setup install." }
+          & $iscc "installer\FS25MapCleaner.iss"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fs25-map-cleaner-build
+          path: |
+            dist/FS25MapCleaner.exe
+            dist/FS25MapCleaner_Portable.zip
+            installer/output/FS25MapCleaner_Setup.exe
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          gh release create $tag `
+            .\dist\FS25MapCleaner.exe `
+            .\dist\FS25MapCleaner_Portable.zip `
+            .\installer\output\FS25MapCleaner_Setup.exe `
+            --title "FS25 Map Cleaner $tag" `
+            --notes-file .\release_notes_template.md
