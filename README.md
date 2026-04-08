@@ -10,7 +10,8 @@ TEST IT OUT AND LEAVE COMMANTS IN https://github.com/ctig2015/FS25MapCleaner/dis
 
 SCREENSHOTS
 
-<img width="1170" height="770" alt="FS25MapCleaner_IymoZ5PGiA" src="https://github.com/user-attachments/assets/a5fd7f18-ef89-4ddf-a90e-bc40f339d9b4" />
+<img width="1000" height="500" alt="FS25MapCleaner_IymoZ5PGiA" src="https://github.com/user-attachments/assets/a5fd7f18-ef89-4ddf-a90e-bc40f339d9b4" />
+
 
 
 
