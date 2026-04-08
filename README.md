@@ -19,7 +19,7 @@ SCREENSHOTS i just used this as an example to see at min it only has the map but
 
 When you pick a map and click delete, the app will:
 
-1. scan your FS25 `mods` folder
+1.  browse to you mod folder as it is not alway default location scan your FS25 `mods` folder
 2. read each mod's `modDesc.xml`
 3. build the full dependency tree for the selected map
 4. check whether any other installed map or mod still uses those dependencies
