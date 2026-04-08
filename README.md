@@ -4,6 +4,10 @@ FS25 Map Cleaner is a simple Windows app for **Farming Simulator 25** that helps
 
 It is made for people who download large maps that may need a lot of extra mods. When you remove a map, the app checks the map's dependency list and then checks your **other installed mods and maps** before deleting anything extra.
 
+
+some pictures of what it does
+
+
 ## What the app does
 
 When you pick a map and click delete, the app will:
