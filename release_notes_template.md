@@ -1,25 +1,17 @@
-## FS25 Map Cleaner
+# FS25 Map Cleaner v1.0.1
 
-### What it does
-- Removes a selected FS25 map
-- Removes dependency mods that are only used by that map
-- Keeps shared dependencies used by other installed mods
+## Download
+Download the file below:
 
-### Included files
-- `FS25MapCleaner_Setup.exe` — normal Windows installer
-- `FS25MapCleaner_Portable.zip` — portable version
-- `FS25MapCleaner.exe` — standalone executable
+**FS25MapCleaner.exe**
 
-### How to use
-1. Install or unzip
-2. Open FS25 Map Cleaner
-3. Choose your `mods` folder
-4. Scan
-5. Pick the map
-6. Analyze
-7. Delete selected + unused deps
+## What's new
+- Added version and build info inside the app
+- Added an **About** button
+- Analysis reports now include version/build details
+- Small polish update after first tester feedback
 
-### Notes
-- No Python required
-- Desktop icon available in installer
-- Lets the user choose install location
+## Notes
+- Close Farming Simulator 25 before using the app
+- Windows may still show a warning because the EXE is not code-signed
+- This release is still the portable EXE version

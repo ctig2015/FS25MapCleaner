@@ -22,7 +22,8 @@ except Exception:
     ttk = None
 
 APP_NAME = "FS25 Map Cleaner"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.0.1"
+APP_BUILD = "2026-04-09"
 
 
 @dataclass
@@ -306,7 +307,7 @@ def move_to_quarantine(path: Path, quarantine_dir: Path) -> Path:
 
 def format_report(result: AnalysisResult, mods_folder: Path, permanent_delete: bool) -> str:
     lines: List[str] = []
-    lines.append(f"{APP_NAME} {APP_VERSION}")
+    lines.append(f"{APP_NAME} v{APP_VERSION} | Build {APP_BUILD}")
     lines.append(f"Generated: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"Mods folder: {mods_folder}")
     lines.append("")
@@ -378,11 +379,7 @@ def execute_cleanup(result: AnalysisResult, mods_folder: Path, permanent_delete:
 class MapCleanerApp:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title(f"{APP_NAME} {APP_VERSION}")
-        try:
-            self.root.iconbitmap(default="assets\\fs25_map_cleaner.ico")
-        except Exception:
-            pass
+        self.root.title(f"{APP_NAME} v{APP_VERSION}")
         self.root.geometry("1180x760")
         self.root.minsize(1000, 650)
 
@@ -462,6 +459,14 @@ class MapCleanerApp:
         ttk.Label(bottom, text=(
             "Tip: Scan your FS25 mods folder, pick a map, analyze it, then remove the map and only the dependencies that are not needed by any other installed mod."
         )).pack(side="left")
+        ttk.Button(bottom, text="About", command=self.show_about).pack(side="right")
+        ttk.Label(bottom, text=f"Version {APP_VERSION} | Build {APP_BUILD}").pack(side="right", padx=(0, 10))
+
+    def show_about(self) -> None:
+        messagebox.showinfo(
+            APP_NAME,
+            f"{APP_NAME}\n\nVersion: {APP_VERSION}\nBuild: {APP_BUILD}\n\nScans an FS25 mods folder, checks the selected map or mod, and removes only unused dependencies that are not needed by other installed mods.",
+        )
 
     def log(self, text: str, clear: bool = False) -> None:
         if clear:

@@ -1,0 +1,21 @@
+FS25 Map Cleaner update package
+
+Copy these files into your existing project folder and replace the old versions:
+- fs25_map_cleaner.py
+- README.md
+- CHANGELOG.md
+- release_notes_template.md
+
+Then run:
+- build_local_exe.bat
+
+Your new EXE will still be named:
+- FS25MapCleaner.exe
+
+But inside the app it will now show:
+- Version 1.0.1
+- Build 2026-04-09
+
+If you later make another update, only change these values near the top of fs25_map_cleaner.py:
+APP_VERSION = "1.0.1"
+APP_BUILD = "2026-04-09"
