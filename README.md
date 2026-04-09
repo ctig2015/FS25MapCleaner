@@ -1,10 +1,15 @@
 # FS25 Map Cleaner
+<<<<<<< HEAD
 
 <p align="center">
   <a href="https://github.com/ctig2015/FS25MapCleaner/releases/latest/download/FS25MapCleaner.exe">
     <img src="assets/fs25-map-cleaner-banner.png" alt="FS25 Map Cleaner" width="900">
   </a>
 </p>
+=======
+that image is just a concept as well but the app is pretty close the this sill works the same
+## Download.
+>>>>>>> 58bf9e848b08c01e4b41569b8cfda832e8e156dc
 
 ## Download
 
