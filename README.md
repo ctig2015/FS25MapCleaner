@@ -2,6 +2,8 @@
 
 ## Download
 
+[![FS25 Map Cleaner banner](assets/fs25-map-cleaner-banner.png)](https://github.com/ctig2015/FS25MapCleaner/releases/latest/download/FS25MapCleaner.exe)
+
 [**Download FS25MapCleaner.exe**](https://github.com/ctig2015/FS25MapCleaner/releases/latest/download/FS25MapCleaner.exe)
 
 FS25 Map Cleaner is a Windows tool for **Farming Simulator 25** that helps you remove a map and only the dependency mods that are no longer used by:
