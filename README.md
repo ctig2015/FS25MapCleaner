@@ -1,5 +1,5 @@
 # FS25 Map Cleaner
-
+that image is just a concept as well but the app is pretty close the this sill works the same
 ## Download.
 
 [![FS25 Map Cleaner banner](assets/fs25-map-cleaner-banner.png)](https://github.com/ctig2015/FS25MapCleaner/releases/latest/download/FS25MapCleaner.exe)
