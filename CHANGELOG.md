@@ -1,16 +1,19 @@
 # Changelog
 
-## 1.0.1
+## v1.1.0 - 2026-04-09
 
-- Added version and build display in the main window
-- Added **About** button with version/build information
-- Added version/build details to analysis reports
-- General release polish for the first feedback update
+### Added
+- optional savegame protection scan
+- support for checking selected savegame XML files for dependency references
+- about box with version and build information
+- cleaner step-by-step interface and stronger review flow
 
-## 1.0.0
+### Changed
+- refreshed UI with a cleaner layout
+- clearer action labels and better visual structure
+- improved review/results section
+- improved README with a full button-by-button guide and clearer usage instructions
 
-- Initial public test release
-- GUI scanning for FS25 mods folders
-- Dependency tree resolution
-- Shared dependency protection
-- Permanent delete and quarantine modes
+### Notes
+- savegame protection is designed to reduce accidental removal of mods still used in another save
+- detection depends on what can be found in savegame XML files and installed mod dependency metadata

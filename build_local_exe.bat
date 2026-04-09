@@ -2,35 +2,32 @@
 setlocal
 cd /d "%~dp0"
 
+echo Building FS25 Map Cleaner EXE...
 where py >nul 2>nul
-if errorlevel 1 (
-  echo Python launcher not found.
-  echo Install Python 3 from python.org first, then run this file again.
-  pause
-  exit /b 1
+if %errorlevel%==0 (
+    set PY_CMD=py
+) else (
+    set PY_CMD=python
 )
 
-py -m pip install --upgrade pip
-py -m pip install pyinstaller
+%PY_CMD% -m pip install --upgrade pip
+if errorlevel 1 goto :fail
 
-if not exist dist mkdir dist
+%PY_CMD% -m pip install pyinstaller
+if errorlevel 1 goto :fail
 
-py -m PyInstaller ^
-  --noconfirm ^
-  --clean ^
-  --onefile ^
-  --windowed ^
-  --name FS25MapCleaner ^
-  --icon assets\fs25_map_cleaner.ico ^
-  fs25_map_cleaner.py
+%PY_CMD% -m PyInstaller --noconfirm --clean --onefile --windowed --name FS25MapCleaner fs25_map_cleaner.py
+if errorlevel 1 goto :fail
 
-if errorlevel 1 (
-  echo Build failed.
-  pause
-  exit /b 1
-)
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Force -Path '.\dist\FS25MapCleaner.exe' -DestinationPath '.\dist\FS25MapCleaner_Portable.zip'"
-
-echo Done. Files are in dist\
+echo.
+echo Done.
+echo EXE location:
+echo %cd%\dist\FS25MapCleaner.exe
 pause
+exit /b 0
+
+:fail
+echo.
+echo Build failed.
+pause
+exit /b 1

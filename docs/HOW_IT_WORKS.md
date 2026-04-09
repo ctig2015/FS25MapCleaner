@@ -1,88 +1,104 @@
 # How FS25 Map Cleaner works
 
-This page explains the delete logic in plain English.
+## Overview
 
-## The goal
+FS25 Map Cleaner is built to answer one simple question safely:
 
-When a player removes a large FS25 map, they often want to remove the extra required mods that came with that map too.
+**If I remove this map, which extra mods can go too, and which ones must stay?**
 
-But there is a problem:
+To do that, the app performs two checks:
 
-Some of those required mods may also be used by other installed maps.
+1. a **mods/dependency check**
+2. an optional **savegame protection check**
 
-So the app must answer this question for every dependency:
+---
 
-**Is this mod only for the selected map, or is something else still using it?**
+## 1. Mods and dependency check
 
-## Step-by-step logic
+When you select a map and click **Analyze Map**, the app:
 
-### 1. Scan the mods folder
+1. reads the selected map's dependencies from `modDesc.xml`
+2. follows those dependencies to build the full dependency tree
+3. checks every other installed item in your `mods` folder
+4. works out which dependencies are shared
+5. keeps shared dependencies and marks only unused ones for removal
 
-The app scans the folder the user chooses.
+### In simple terms
 
-It reads:
-- ZIP mods
-- folder mods
+If another installed map or mod still needs a dependency, the app keeps it.
 
-### 2. Read each mod's `modDesc.xml`
+---
 
-For each installed mod, the app reads the dependency list from `modDesc.xml`.
+## 2. Savegame protection check
 
-### 3. Build the selected map's dependency tree
+If you add one or more savegame folders, the app also scans XML files inside those savegames.
 
-When the user picks a map, the app starts with that map and follows its dependencies.
+This is to catch cases where a dependency mod is still in use in a different save through:
 
-If the map depends on `A`, and `A` depends on `B`, then the tree includes:
-- the map itself
-- `A`
-- `B`
+- vehicles
+- placeables
+- buildings
+- other saved references in XML files
 
-### 4. Check every other installed mod and map
+### Files that may be scanned
 
-For each dependency in the selected map's tree, the app checks the rest of the installed mods.
+Examples include:
+- `vehicles.xml`
+- `placeables.xml`
+- other XML files found inside the selected savegame folders
 
-If another installed mod still depends on that dependency, it is marked as **shared**.
+### In simple terms
 
-### 5. Decide what to delete
+If the app finds signs that a dependency mod is still used in a protected savegame, it keeps that mod instead of removing it.
 
-The app removes:
-- the selected map
-- dependencies that are not used by anything else
+---
 
-The app keeps:
-- dependencies still used by another installed mod or map
+## Final decision rules
+
+A dependency is **kept** if any of these are true:
+
+- another installed map depends on it
+- another installed mod depends on it
+- one of the selected savegames still appears to reference it
+
+A dependency is **removed** only if none of those checks say it is still needed.
+
+---
 
 ## Example
 
-Selected map:
-- `FS25_BigMap`
+You want to remove **Map A**.
 
-Dependencies:
-- `RequiredPack_A`
-- `RequiredPack_B`
-- `RequiredPack_C`
+Map A depends on:
+- Pack 1
+- Pack 2
+- Pack 3
 
-Other installed maps:
-- `FS25_CountryMap` uses `RequiredPack_B`
+The app checks:
+- does another installed map use Pack 1, 2, or 3?
+- does another installed mod use Pack 1, 2, or 3?
+- do your protected savegames still reference Pack 1, 2, or 3?
 
-Delete result:
-- delete `FS25_BigMap`
-- delete `RequiredPack_A`
-- keep `RequiredPack_B`
-- delete `RequiredPack_C`
+Possible result:
+- Pack 1 = remove
+- Pack 2 = keep because another map still uses it
+- Pack 3 = keep because a savegame still references it
 
-## What counts as shared
+That means the app removes only:
+- the selected map
+- Pack 1
 
-A dependency counts as shared when another installed mod or map lists it as a dependency too.
+---
 
-## Why this is safer than deleting everything
+## Important limitation
 
-A lot of map packs reuse the same support mods.
+The result can only be as accurate as the information the app can see.
 
-If the app deleted every required mod without checking other installed maps, it could break maps the player still wants to keep.
+That means accuracy depends on:
 
-## Limit
+- whether mod authors declared dependencies correctly in `modDesc.xml`
+- whether the savegame still shows the relevant mod usage in XML text
 
-The result depends on how correctly the installed mods declare their dependencies.
+If a mod has missing dependency metadata, or a save references something in a way that does not appear clearly in XML, the app may not detect every relationship perfectly.
 
-If a mod is missing dependency information or uses unusual custom behavior outside normal dependency declarations, no cleanup tool can detect that perfectly.
+That is why the review step is important.

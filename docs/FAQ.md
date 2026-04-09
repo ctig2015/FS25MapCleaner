@@ -1,39 +1,34 @@
 # FAQ
 
-## Will it delete shared mods used by another map?
+## Does the app remove every dependency from the selected map?
+No. It removes only the dependencies that are no longer needed by another installed mod, map, or protected savegame.
 
-No. The app checks other installed mods and keeps dependencies that are still in use.
+## What does **Scan Mods** do?
+It scans the selected FS25 `mods` folder, reads dependency data, and fills the map/mod list.
 
-## Does it only work for maps?
+## What does **Analyze Map** do?
+It checks the selected map's dependency tree and works out what can be removed safely and what must be kept.
 
-It can analyze mods too, but the main use is removing maps and their unused required mods.
+## What does **Add Savegame…** do?
+It adds a savegame folder to the protection list so the app can check whether dependency mods are still used in that save.
 
-## Can it analyze before deleting?
+## What does **Remove Selected** in the savegame section do?
+It removes the highlighted savegame from the protection list only. It does not delete the savegame itself.
 
-Yes. Users can scan the folder, choose a map, and analyze it before deleting anything.
+## What does **Clear** in the savegame section do?
+It clears the whole savegame protection list. It does not delete any savegames.
 
-## Does the user need Python installed?
+## What does **Delete permanently** do?
+It tells the app to delete files directly instead of using quarantine. Use it only if you are sure.
 
-No. End users should use the built Windows installer or portable EXE.
+## What does **Remove Map + Unused Dependencies** do?
+It removes the selected map and any dependency mods the app believes are no longer needed anywhere else.
 
-## Can the user choose where to install the program?
+## Why would I use savegame protection?
+Because you might remove one map but still use a vehicle, building, or placeable from one of that map's dependency mods in another save.
 
-Yes. The installer lets the user browse to a folder or drive they want.
+## Is the savegame scan perfect?
+No. It is a best-effort safety feature based on XML references the app can detect.
 
-## Can it create a desktop icon?
-
-Yes. The installer includes a desktop icon option.
-
-## What file should people download from GitHub?
-
-Most people should download:
-
-- `FS25MapCleaner_Setup.exe`
-
-Optional:
-
-- `FS25MapCleaner_Portable.zip`
-
-## What if a mod author did not declare dependencies properly?
-
-Then the result may not be perfect. The app is only as accurate as the dependency data found in installed mods.
+## Do I still need to review the results before deleting?
+Yes. The review panel is there to help you double-check what will be removed and what will be kept.

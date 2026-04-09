@@ -15,15 +15,29 @@ import xml.etree.ElementTree as ET
 try:
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
-except Exception:
+    from tkinter import font as tkfont
+except Exception:  # pragma: no cover
     tk = None
     filedialog = None
     messagebox = None
     ttk = None
+    tkfont = None
 
 APP_NAME = "FS25 Map Cleaner"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.1.0"
 APP_BUILD = "2026-04-09"
+APP_SUBTITLE = "Remove a map and only the dependency mods no other installed map or save still uses."
+
+ACCENT = "#2676c8"
+ACCENT_DARK = "#1f5fa1"
+SUCCESS = "#2d8b57"
+WARNING = "#e8b339"
+DANGER = "#c94a4a"
+BG = "#eef2f6"
+CARD_BG = "#ffffff"
+HEADER_BG = "#f7f9fc"
+TEXT = "#1d2630"
+MUTED = "#5d6b79"
 
 
 @dataclass
@@ -39,14 +53,22 @@ class ModInfo:
 
 
 @dataclass
+class KeepReason:
+    mod: ModInfo
+    shared_with_mods: List[str] = field(default_factory=list)
+    shared_with_savegames: Dict[str, List[str]] = field(default_factory=dict)
+
+
+@dataclass
 class AnalysisResult:
     target_name: str
     target_title: str
     to_delete: List[ModInfo] = field(default_factory=list)
-    kept_shared: List[Tuple[ModInfo, List[str]]] = field(default_factory=list)
+    kept: List[KeepReason] = field(default_factory=list)
     missing_dependencies: List[str] = field(default_factory=list)
     dependents_on_target: List[ModInfo] = field(default_factory=list)
     dependency_tree: List[str] = field(default_factory=list)
+    scanned_savegames: List[Path] = field(default_factory=list)
 
 
 # -----------------------------
@@ -70,7 +92,6 @@ def parse_moddesc(xml_text: str) -> Tuple[str, List[str], List[str]]:
     except ET.ParseError as exc:
         return title, dependencies, [f"Invalid modDesc.xml: {exc}"]
 
-    # Title may be plain text or nested language elements
     title_elem = root.find("title")
     if title_elem is not None:
         if (title_elem.text or "").strip():
@@ -96,7 +117,6 @@ def parse_moddesc(xml_text: str) -> Tuple[str, List[str], List[str]]:
                 if cleaned:
                     dependencies.append(cleaned)
 
-    # normalize and unique, preserve order
     seen: Set[str] = set()
     unique_dependencies: List[str] = []
     for dep in dependencies:
@@ -198,20 +218,28 @@ def read_mod_info(path: Path) -> ModInfo:
         return info
 
 
-def scan_mods_folder(mods_folder: Path) -> Dict[str, ModInfo]:
+class ScanProgressCallback:
+    def update(self, current: int, total: int, name: str) -> None:  # pragma: no cover - interface only
+        pass
+
+
+def scan_mods_folder(mods_folder: Path, progress: Optional[ScanProgressCallback] = None) -> Dict[str, ModInfo]:
     mods: Dict[str, ModInfo] = {}
     if not mods_folder.exists() or not mods_folder.is_dir():
         raise FileNotFoundError(f"Mods folder not found: {mods_folder}")
 
-    for item in sorted(mods_folder.iterdir(), key=lambda p: p.name.lower()):
-        if item.name.startswith("."):
-            continue
-        if item.name == "__pycache__":
-            continue
-        if item.is_file() and item.suffix.lower() != ".zip":
-            continue
-        if item.is_dir() and item.name.startswith("_cleanup_quarantine"):
-            continue
+    items = [
+        item for item in sorted(mods_folder.iterdir(), key=lambda p: p.name.lower())
+        if not item.name.startswith(".")
+        and item.name != "__pycache__"
+        and not (item.is_file() and item.suffix.lower() != ".zip")
+        and not (item.is_dir() and item.name.startswith("_cleanup_quarantine"))
+    ]
+
+    total = len(items)
+    for idx, item in enumerate(items, start=1):
+        if progress is not None:
+            progress.update(idx, total, item.name)
         mod = read_mod_info(item)
         mods[mod.name] = mod
     return mods
@@ -237,20 +265,62 @@ def resolve_dependency_tree(root_name: str, mod_by_name: Dict[str, ModInfo]) -> 
     return order
 
 
-def analyze_target(target_name: str, mod_by_name: Dict[str, ModInfo]) -> AnalysisResult:
+def _compile_name_pattern(mod_name: str) -> re.Pattern[str]:
+    return re.compile(rf"(?<![a-z0-9]){re.escape(mod_name.lower())}(?![a-z0-9])")
+
+
+def scan_savegame_usage(savegame_folders: Iterable[Path], candidate_mod_names: Iterable[str]) -> Dict[str, Dict[str, List[str]]]:
+    candidates = [name for name in candidate_mod_names if name]
+    if not candidates:
+        return {}
+
+    patterns = {name: _compile_name_pattern(name) for name in candidates}
+    hits: Dict[str, Dict[str, List[str]]] = {}
+
+    for folder in savegame_folders:
+        if not folder.exists() or not folder.is_dir():
+            continue
+        save_label = folder.name
+        for root, _dirs, files in os.walk(folder):
+            for filename in files:
+                if not filename.lower().endswith(".xml"):
+                    continue
+                xml_path = Path(root) / filename
+                try:
+                    text = xml_path.read_text(encoding="utf-8", errors="replace").lower()
+                except Exception:
+                    continue
+
+                rel_path = str(xml_path.relative_to(folder)).replace("\\", "/")
+                for mod_name, pattern in patterns.items():
+                    if pattern.search(text):
+                        save_hits = hits.setdefault(mod_name, {}).setdefault(save_label, [])
+                        if rel_path not in save_hits:
+                            save_hits.append(rel_path)
+    return hits
+
+
+def analyze_target(
+    target_name: str,
+    mod_by_name: Dict[str, ModInfo],
+    savegame_folders: Optional[Iterable[Path]] = None,
+) -> AnalysisResult:
     if target_name not in mod_by_name:
         raise KeyError(f"Target mod not found: {target_name}")
 
     target = mod_by_name[target_name]
     tree = resolve_dependency_tree(target_name, mod_by_name)
     tree_set = set(tree)
+    scanned_savegames = [Path(p) for p in (savegame_folders or []) if Path(p).exists()]
+    save_hits = scan_savegame_usage(scanned_savegames, [name for name in tree if name != target_name])
+
     result = AnalysisResult(
         target_name=target.name,
         target_title=target.title,
         dependency_tree=tree,
+        scanned_savegames=scanned_savegames,
     )
 
-    # Other installed mods that depend on target directly.
     for mod in mod_by_name.values():
         if mod.name == target.name:
             continue
@@ -267,22 +337,33 @@ def analyze_target(target_name: str, mod_by_name: Dict[str, ModInfo]) -> Analysi
             result.to_delete.append(mod)
             continue
 
-        shared_with: List[str] = []
+        shared_with_mods: List[str] = []
         for other in mod_by_name.values():
             if other.name == mod.name:
                 continue
             if other.name in tree_set:
                 continue
             if mod.name in other.dependencies:
-                shared_with.append(other.name)
+                shared_with_mods.append(other.name)
 
-        if shared_with:
-            result.kept_shared.append((mod, sorted(shared_with, key=str.lower)))
+        shared_with_savegames = {
+            save_name: files
+            for save_name, files in sorted(save_hits.get(mod.name, {}).items(), key=lambda item: item[0].lower())
+        }
+
+        if shared_with_mods or shared_with_savegames:
+            result.kept.append(
+                KeepReason(
+                    mod=mod,
+                    shared_with_mods=sorted(shared_with_mods, key=str.lower),
+                    shared_with_savegames=shared_with_savegames,
+                )
+            )
         else:
             result.to_delete.append(mod)
 
     result.to_delete.sort(key=lambda m: m.name.lower())
-    result.kept_shared.sort(key=lambda item: item[0].name.lower())
+    result.kept.sort(key=lambda item: item.mod.name.lower())
     result.missing_dependencies.sort(key=str.lower)
     result.dependents_on_target.sort(key=lambda m: m.name.lower())
     return result
@@ -310,9 +391,16 @@ def format_report(result: AnalysisResult, mods_folder: Path, permanent_delete: b
     lines.append(f"{APP_NAME} v{APP_VERSION} | Build {APP_BUILD}")
     lines.append(f"Generated: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"Mods folder: {mods_folder}")
+    lines.append(f"Delete mode: {'PERMANENT DELETE' if permanent_delete else 'MOVE TO QUARANTINE'}")
+    if result.scanned_savegames:
+        lines.append("Savegame protection:")
+        for folder in result.scanned_savegames:
+            lines.append(f"  - {folder}")
+    else:
+        lines.append("Savegame protection: off")
+
     lines.append("")
     lines.append(f"Target: {result.target_name} | Title: {result.target_title}")
-    lines.append(f"Delete mode: {'PERMANENT DELETE' if permanent_delete else 'MOVE TO QUARANTINE'}")
     lines.append("")
     lines.append("Dependency tree:")
     for name in result.dependency_tree:
@@ -327,10 +415,21 @@ def format_report(result: AnalysisResult, mods_folder: Path, permanent_delete: b
         lines.append("  - none")
 
     lines.append("")
-    lines.append("Items kept because they are shared with other installed mods:")
-    if result.kept_shared:
-        for mod, shared_with in result.kept_shared:
-            lines.append(f"  - {mod.name}  [still needed by: {', '.join(shared_with)}]")
+    lines.append("Items kept because they are still used elsewhere:")
+    if result.kept:
+        for keep in result.kept:
+            reason_bits = []
+            if keep.shared_with_mods:
+                reason_bits.append(f"used by mods/maps: {', '.join(keep.shared_with_mods)}")
+            if keep.shared_with_savegames:
+                save_bits = []
+                for save_name, files in keep.shared_with_savegames.items():
+                    if files:
+                        save_bits.append(f"{save_name} ({', '.join(files[:3])}{'...' if len(files) > 3 else ''})")
+                    else:
+                        save_bits.append(save_name)
+                reason_bits.append(f"used by savegames: {', '.join(save_bits)}")
+            lines.append(f"  - {keep.mod.name}  [{' | '.join(reason_bits)}]")
     else:
         lines.append("  - none")
 
@@ -373,6 +472,46 @@ def execute_cleanup(result: AnalysisResult, mods_folder: Path, permanent_delete:
 
 
 # -----------------------------
+# GUI helpers
+# -----------------------------
+
+def try_set_icon(root: tk.Tk) -> None:
+    try:
+        icon_path = Path(__file__).resolve().parent / "assets" / "fs25_map_cleaner.ico"
+        if icon_path.exists():
+            root.iconbitmap(default=str(icon_path))
+    except Exception:
+        pass
+
+
+def make_card(parent: tk.Widget, title: str) -> Tuple[tk.Frame, tk.Frame]:
+    card = tk.Frame(parent, bg=CARD_BG, bd=1, relief="solid", highlightthickness=0)
+    header = tk.Label(
+        card,
+        text=title,
+        bg=ACCENT,
+        fg="white",
+        font=("Segoe UI", 12, "bold"),
+        anchor="w",
+        padx=14,
+        pady=10,
+    )
+    header.pack(fill="x")
+    body = tk.Frame(card, bg=CARD_BG, padx=12, pady=12)
+    body.pack(fill="both", expand=True)
+    return card, body
+
+
+class _TkProgressAdapter(ScanProgressCallback):
+    def __init__(self, app: "MapCleanerApp"):
+        self.app = app
+
+    def update(self, current: int, total: int, name: str) -> None:
+        self.app.set_status(f"Scanning {current}/{total}: {name}")
+        self.app.root.update_idletasks()
+
+
+# -----------------------------
 # GUI
 # -----------------------------
 
@@ -380,49 +519,161 @@ class MapCleanerApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title(f"{APP_NAME} v{APP_VERSION}")
-        self.root.geometry("1180x760")
-        self.root.minsize(1000, 650)
+        self.root.geometry("1420x880")
+        self.root.minsize(1180, 760)
+        self.root.configure(bg=BG)
+        try_set_icon(root)
 
         self.mods_folder_var = tk.StringVar()
         self.filter_var = tk.StringVar()
         self.show_maps_only_var = tk.BooleanVar(value=True)
         self.permanent_delete_var = tk.BooleanVar(value=True)
+        self.status_var = tk.StringVar(value="Ready")
+        self.summary_var = tk.StringVar(value="Select your FS25 mods folder, scan it, pick a map, then analyze the result.")
 
         self.mod_index: Dict[str, ModInfo] = {}
         self.filtered_keys: List[str] = []
         self.last_result: Optional[AnalysisResult] = None
+        self.savegame_folders: List[Path] = []
 
+        self._setup_styles()
         self._build_ui()
+        self.render_welcome()
+
+    def _setup_styles(self) -> None:
+        style = ttk.Style(self.root)
+        try:
+            if "clam" in style.theme_names():
+                style.theme_use("clam")
+        except Exception:
+            pass
+
+        style.configure("App.TFrame", background=BG)
+        style.configure("Card.TFrame", background=CARD_BG)
+        style.configure("TLabel", background=CARD_BG, foreground=TEXT, font=("Segoe UI", 10))
+        style.configure("Muted.TLabel", background=CARD_BG, foreground=MUTED, font=("Segoe UI", 10))
+        style.configure("Section.TLabel", background=CARD_BG, foreground=TEXT, font=("Segoe UI", 11, "bold"))
+        style.configure("TEntry", padding=6)
+        style.configure("TCombobox", padding=6)
+        style.configure("Primary.TButton", background=ACCENT, foreground="white", borderwidth=0, focusthickness=3, focuscolor=ACCENT)
+        style.map("Primary.TButton", background=[("active", ACCENT_DARK), ("disabled", "#96bde3")], foreground=[("disabled", "#f3f7fb")])
+        style.configure("Danger.TButton", background=WARNING, foreground="#202020", borderwidth=0)
+        style.map("Danger.TButton", background=[("active", "#cf9e2f"), ("disabled", "#f2dda1")])
+        style.configure("Secondary.TButton", background="#e8edf4", foreground=TEXT, borderwidth=0)
+        style.map("Secondary.TButton", background=[("active", "#d9e2ec")])
+        style.configure("Treeview", rowheight=32, font=("Segoe UI", 10), background="white", fieldbackground="white")
+        style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"), padding=(8, 8))
 
     def _build_ui(self) -> None:
-        outer = ttk.Frame(self.root, padding=10)
+        outer = tk.Frame(self.root, bg=BG, padx=14, pady=14)
         outer.pack(fill="both", expand=True)
 
-        top = ttk.LabelFrame(outer, text="Mods folder", padding=10)
-        top.pack(fill="x", pady=(0, 10))
+        self._build_header(outer)
+        self._build_step1(outer)
 
-        ttk.Entry(top, textvariable=self.mods_folder_var).pack(side="left", fill="x", expand=True, padx=(0, 8))
-        ttk.Button(top, text="Browse…", command=self.pick_folder).pack(side="left", padx=(0, 8))
-        ttk.Button(top, text="Scan", command=self.scan).pack(side="left")
+        middle = tk.Frame(outer, bg=BG)
+        middle.pack(fill="both", expand=True, pady=(12, 12))
+        middle.columnconfigure(0, weight=7)
+        middle.columnconfigure(1, weight=6)
+        middle.rowconfigure(0, weight=1)
 
-        middle = ttk.Panedwindow(outer, orient="horizontal")
-        middle.pack(fill="both", expand=True)
+        self._build_step2(middle)
+        self._build_step3(middle)
 
-        left = ttk.Frame(middle, padding=(0, 0, 8, 0))
-        right = ttk.Frame(middle)
-        middle.add(left, weight=1)
-        middle.add(right, weight=2)
+        self._build_step4(outer)
+        self._build_status_bar(outer)
 
-        filter_row = ttk.Frame(left)
-        filter_row.pack(fill="x", pady=(0, 8))
-        ttk.Label(filter_row, text="Find:").pack(side="left")
-        filter_entry = ttk.Entry(filter_row, textvariable=self.filter_var)
-        filter_entry.pack(side="left", fill="x", expand=True, padx=(6, 8))
-        filter_entry.bind("<KeyRelease>", lambda _e: self.refresh_list())
-        ttk.Checkbutton(filter_row, text="Show probable maps only", variable=self.show_maps_only_var, command=self.refresh_list).pack(side="left")
+    def _build_header(self, parent: tk.Widget) -> None:
+        header = tk.Frame(parent, bg=HEADER_BG, bd=1, relief="solid")
+        header.pack(fill="x")
 
-        list_frame = ttk.LabelFrame(left, text="Select map / mod to remove", padding=6)
-        list_frame.pack(fill="both", expand=True)
+        title_row = tk.Frame(header, bg=HEADER_BG, padx=16, pady=14)
+        title_row.pack(fill="x")
+        tk.Label(title_row, text="🪶", bg=HEADER_BG, fg=ACCENT, font=("Segoe UI Emoji", 22)).pack(side="left", padx=(0, 10))
+        text_col = tk.Frame(title_row, bg=HEADER_BG)
+        text_col.pack(side="left", fill="x", expand=True)
+        tk.Label(text_col, text=APP_NAME, bg=HEADER_BG, fg=TEXT, font=("Segoe UI", 24, "bold")).pack(anchor="w")
+        tk.Label(text_col, text=APP_SUBTITLE, bg=HEADER_BG, fg=MUTED, font=("Segoe UI", 12)).pack(anchor="w", pady=(4, 0))
+        tk.Label(
+            title_row,
+            text=f"Version {APP_VERSION} | Build {APP_BUILD}",
+            bg=HEADER_BG,
+            fg=MUTED,
+            font=("Segoe UI", 11),
+        ).pack(side="right")
+
+    def _build_step1(self, parent: tk.Widget) -> None:
+        card, body = make_card(parent, "Step 1 – Select FS25 Mods Folder and Optional Savegame Protection")
+        card.pack(fill="x", pady=(12, 0))
+        body.columnconfigure(1, weight=1)
+
+        tk.Label(body, text="FS25 Mods Folder", bg=CARD_BG, fg=TEXT, font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 8))
+        mods_row = tk.Frame(body, bg=CARD_BG)
+        mods_row.grid(row=1, column=0, columnspan=4, sticky="ew")
+        mods_row.columnconfigure(0, weight=1)
+        ttk.Entry(mods_row, textvariable=self.mods_folder_var).grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        ttk.Button(mods_row, text="Browse…", style="Secondary.TButton", command=self.pick_mods_folder).grid(row=0, column=1, padx=(0, 8))
+        ttk.Button(mods_row, text="Scan Mods", style="Primary.TButton", command=self.scan).grid(row=0, column=2)
+
+        hint = (
+            "Optional savegame scan protects dependency mods if they are still referenced in another savegame "
+            "(for example in vehicles.xml or placeables.xml)."
+        )
+        tk.Label(body, text=hint, bg=CARD_BG, fg=MUTED, wraplength=1180, justify="left", font=("Segoe UI", 10)).grid(
+            row=2, column=0, columnspan=4, sticky="w", pady=(12, 8)
+        )
+
+        save_frame = tk.Frame(body, bg=CARD_BG)
+        save_frame.grid(row=3, column=0, columnspan=4, sticky="ew")
+        save_frame.columnconfigure(0, weight=1)
+
+        self.savegame_listbox = tk.Listbox(
+            save_frame,
+            height=4,
+            activestyle="none",
+            font=("Segoe UI", 10),
+            selectmode="extended",
+            relief="solid",
+            bd=1,
+            highlightthickness=0,
+        )
+        self.savegame_listbox.grid(row=0, column=0, rowspan=3, sticky="nsew", padx=(0, 10))
+
+        ttk.Button(save_frame, text="Add Savegame…", style="Secondary.TButton", command=self.add_savegame_folder).grid(row=0, column=1, sticky="ew", pady=(0, 6))
+        ttk.Button(save_frame, text="Remove Selected", style="Secondary.TButton", command=self.remove_selected_savegames).grid(row=1, column=1, sticky="ew", pady=(0, 6))
+        ttk.Button(save_frame, text="Clear", style="Secondary.TButton", command=self.clear_savegames).grid(row=2, column=1, sticky="ew")
+
+    def _build_step2(self, parent: tk.Widget) -> None:
+        card, body = make_card(parent, "Step 2 – Choose Map")
+        card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        body.rowconfigure(2, weight=1)
+        body.columnconfigure(0, weight=1)
+
+        top_row = tk.Frame(body, bg=CARD_BG)
+        top_row.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        top_row.columnconfigure(0, weight=1)
+        search_entry = ttk.Entry(top_row, textvariable=self.filter_var)
+        search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        search_entry.bind("<KeyRelease>", lambda _e: self.refresh_list())
+        tk.Checkbutton(
+            top_row,
+            text="Show maps only",
+            variable=self.show_maps_only_var,
+            command=self.refresh_list,
+            bg=CARD_BG,
+            fg=TEXT,
+            activebackground=CARD_BG,
+            activeforeground=TEXT,
+            selectcolor="white",
+            font=("Segoe UI", 10),
+        ).grid(row=0, column=1)
+
+        tk.Label(body, text="Pick the map or mod you want to remove.", bg=CARD_BG, fg=MUTED, font=("Segoe UI", 10)).grid(row=1, column=0, sticky="w", pady=(0, 8))
+
+        list_frame = tk.Frame(body, bg=CARD_BG)
+        list_frame.grid(row=2, column=0, sticky="nsew")
+        list_frame.rowconfigure(0, weight=1)
+        list_frame.columnconfigure(0, weight=1)
 
         columns = ("type", "deps", "title")
         self.tree = ttk.Treeview(list_frame, columns=columns, show="tree headings", selectmode="browse")
@@ -430,54 +681,164 @@ class MapCleanerApp:
         self.tree.heading("type", text="Type")
         self.tree.heading("deps", text="Deps")
         self.tree.heading("title", text="Title")
-        self.tree.column("#0", width=210, stretch=True)
-        self.tree.column("type", width=70, anchor="center")
-        self.tree.column("deps", width=50, anchor="center")
-        self.tree.column("title", width=220, stretch=True)
-        self.tree.pack(side="left", fill="both", expand=True)
+        self.tree.column("#0", width=250, stretch=True)
+        self.tree.column("type", width=80, anchor="center")
+        self.tree.column("deps", width=60, anchor="center")
+        self.tree.column("title", width=260, stretch=True)
+        self.tree.grid(row=0, column=0, sticky="nsew")
         self.tree.bind("<<TreeviewSelect>>", lambda _e: self.preview_selected())
-        scroll = ttk.Scrollbar(list_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scroll.set)
-        scroll.pack(side="right", fill="y")
 
-        actions = ttk.Frame(left)
-        actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(actions, text="Analyze selected", command=self.analyze_selected).pack(side="left", padx=(0, 8))
-        ttk.Button(actions, text="Delete selected + unused deps", command=self.delete_selected).pack(side="left", padx=(0, 8))
-        ttk.Checkbutton(actions, text="Permanent delete (skip quarantine)", variable=self.permanent_delete_var).pack(side="left")
+        yscroll = ttk.Scrollbar(list_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=yscroll.set)
+        yscroll.grid(row=0, column=1, sticky="ns")
 
-        output_frame = ttk.LabelFrame(right, text="Analysis / log", padding=6)
-        output_frame.pack(fill="both", expand=True)
-        self.output = tk.Text(output_frame, wrap="word")
-        self.output.pack(side="left", fill="both", expand=True)
-        output_scroll = ttk.Scrollbar(output_frame, orient="vertical", command=self.output.yview)
-        self.output.configure(yscrollcommand=output_scroll.set)
-        output_scroll.pack(side="right", fill="y")
+        xscroll = ttk.Scrollbar(list_frame, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(xscrollcommand=xscroll.set)
+        xscroll.grid(row=1, column=0, sticky="ew")
 
-        bottom = ttk.Frame(outer)
-        bottom.pack(fill="x", pady=(8, 0))
-        ttk.Label(bottom, text=(
-            "Tip: Scan your FS25 mods folder, pick a map, analyze it, then remove the map and only the dependencies that are not needed by any other installed mod."
-        )).pack(side="left")
-        ttk.Button(bottom, text="About", command=self.show_about).pack(side="right")
-        ttk.Label(bottom, text=f"Version {APP_VERSION} | Build {APP_BUILD}").pack(side="right", padx=(0, 10))
+        button_row = tk.Frame(body, bg=CARD_BG)
+        button_row.grid(row=3, column=0, sticky="ew", pady=(12, 0))
+        ttk.Button(button_row, text="Analyze Map", style="Primary.TButton", command=self.analyze_selected).pack(side="right")
 
-    def show_about(self) -> None:
-        messagebox.showinfo(
-            APP_NAME,
-            f"{APP_NAME}\n\nVersion: {APP_VERSION}\nBuild: {APP_BUILD}\n\nScans an FS25 mods folder, checks the selected map or mod, and removes only unused dependencies that are not needed by other installed mods.",
+    def _build_step3(self, parent: tk.Widget) -> None:
+        card, body = make_card(parent, "Step 3 – Review Results")
+        card.grid(row=0, column=1, sticky="nsew")
+        body.rowconfigure(1, weight=1)
+        body.columnconfigure(0, weight=1)
+
+        tk.Label(body, textvariable=self.summary_var, bg=CARD_BG, fg=TEXT, justify="left", anchor="w", wraplength=560, font=("Segoe UI", 11, "bold")).grid(
+            row=0, column=0, sticky="ew", pady=(0, 8)
         )
 
+        output_wrap = tk.Frame(body, bg="#fdfefe", bd=1, relief="solid")
+        output_wrap.grid(row=1, column=0, sticky="nsew")
+        output_wrap.rowconfigure(0, weight=1)
+        output_wrap.columnconfigure(0, weight=1)
+        self.output = tk.Text(
+            output_wrap,
+            wrap="word",
+            relief="flat",
+            bd=0,
+            padx=14,
+            pady=14,
+            font=("Segoe UI", 11),
+            fg=TEXT,
+            bg="#fdfefe",
+            state="disabled",
+        )
+        self.output.grid(row=0, column=0, sticky="nsew")
+        scroll = ttk.Scrollbar(output_wrap, orient="vertical", command=self.output.yview)
+        self.output.configure(yscrollcommand=scroll.set)
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.output.tag_configure("h1", font=("Segoe UI", 14, "bold"), spacing1=10, spacing3=8)
+        self.output.tag_configure("h2", font=("Segoe UI", 11, "bold"), spacing1=8, spacing3=4)
+        self.output.tag_configure("ok", foreground=SUCCESS)
+        self.output.tag_configure("warn", foreground="#9c6a00")
+        self.output.tag_configure("danger", foreground=DANGER)
+        self.output.tag_configure("muted", foreground=MUTED)
+
+    def _build_step4(self, parent: tk.Widget) -> None:
+        card, body = make_card(parent, "Step 4 – Remove Files")
+        card.pack(fill="x")
+
+        top_row = tk.Frame(body, bg=CARD_BG)
+        top_row.pack(fill="x")
+        tk.Checkbutton(
+            top_row,
+            text="Delete permanently (skip quarantine)",
+            variable=self.permanent_delete_var,
+            bg=CARD_BG,
+            fg=TEXT,
+            activebackground=CARD_BG,
+            activeforeground=TEXT,
+            selectcolor="white",
+            font=("Segoe UI", 10),
+        ).pack(side="left")
+        tk.Label(
+            top_row,
+            text="Shared dependencies and savegame-used mods are kept automatically.",
+            bg=CARD_BG,
+            fg=MUTED,
+            font=("Segoe UI", 10),
+        ).pack(side="left", padx=(16, 0))
+
+        danger_row = tk.Frame(body, bg=CARD_BG)
+        danger_row.pack(fill="x", pady=(12, 0))
+        self.delete_button = ttk.Button(
+            danger_row,
+            text="Remove Map + Unused Dependencies",
+            style="Danger.TButton",
+            command=self.delete_selected,
+        )
+        self.delete_button.pack(side="right")
+        ttk.Button(danger_row, text="About", style="Secondary.TButton", command=self.show_about).pack(side="right", padx=(0, 10))
+
+    def _build_status_bar(self, parent: tk.Widget) -> None:
+        bar = tk.Frame(parent, bg=HEADER_BG, bd=1, relief="solid", padx=12, pady=8)
+        bar.pack(fill="x", pady=(12, 0))
+        tk.Label(bar, textvariable=self.status_var, bg=HEADER_BG, fg=SUCCESS, font=("Segoe UI", 11, "bold")).pack(side="left")
+        tk.Label(bar, text=f"Version {APP_VERSION} | Build {APP_BUILD}", bg=HEADER_BG, fg=MUTED, font=("Segoe UI", 10)).pack(side="right")
+
+    def set_status(self, text: str) -> None:
+        self.status_var.set(text)
+
     def log(self, text: str, clear: bool = False) -> None:
+        self.output.configure(state="normal")
         if clear:
             self.output.delete("1.0", "end")
         self.output.insert("end", text + "\n")
         self.output.see("end")
+        self.output.configure(state="disabled")
 
-    def pick_folder(self) -> None:
+    def clear_output(self) -> None:
+        self.output.configure(state="normal")
+        self.output.delete("1.0", "end")
+        self.output.configure(state="disabled")
+
+    def render_welcome(self) -> None:
+        self.summary_var.set("Select your FS25 mods folder, scan it, pick a map, then analyze the result.")
+        self.output.configure(state="normal")
+        self.output.delete("1.0", "end")
+        self.output.insert("end", "FS25 Map Cleaner\n", "h1")
+        self.output.insert("end", "Designed to make removing large FS25 maps far easier when they need lots of extra mods.\n\n")
+        self.output.insert("end", "What it does\n", "h2")
+        self.output.insert("end", "• Scans your mods folder and reads dependency data from modDesc.xml\n")
+        self.output.insert("end", "• Lets you analyze a map before deleting anything\n")
+        self.output.insert("end", "• Keeps dependencies used by other installed maps or mods\n")
+        self.output.insert("end", "• Optionally scans selected savegames and keeps mods still referenced there\n\n")
+        self.output.insert("end", "Suggested flow\n", "h2")
+        self.output.insert("end", "1. Pick your FS25 mods folder\n2. Add any savegames you want protected\n3. Scan mods\n4. Select the map\n5. Analyze the result\n6. Remove only what is no longer needed\n", "muted")
+        self.output.configure(state="disabled")
+
+    def pick_mods_folder(self) -> None:
         folder = filedialog.askdirectory(title="Select your Farming Simulator 25 mods folder")
         if folder:
             self.mods_folder_var.set(folder)
+
+    def add_savegame_folder(self) -> None:
+        folder = filedialog.askdirectory(title="Select an FS25 savegame folder to protect")
+        if not folder:
+            return
+        path = Path(folder)
+        if path in self.savegame_folders:
+            return
+        self.savegame_folders.append(path)
+        self.savegame_listbox.insert("end", str(path))
+        self.set_status(f"Added savegame protection: {path.name}")
+
+    def remove_selected_savegames(self) -> None:
+        indices = list(self.savegame_listbox.curselection())
+        if not indices:
+            return
+        for index in reversed(indices):
+            self.savegame_listbox.delete(index)
+            del self.savegame_folders[index]
+        self.set_status("Removed selected savegame protection folder(s).")
+
+    def clear_savegames(self) -> None:
+        self.savegame_folders.clear()
+        self.savegame_listbox.delete(0, "end")
+        self.set_status("Savegame protection cleared.")
 
     def scan(self) -> None:
         folder_text = self.mods_folder_var.get().strip()
@@ -486,16 +847,24 @@ class MapCleanerApp:
             return
         mods_folder = Path(folder_text)
         try:
-            self.log("Scanning mods folder...", clear=True)
-            self.mod_index = scan_mods_folder(mods_folder)
+            self.last_result = None
+            self.summary_var.set("Scanning mods folder…")
+            self.clear_output()
+            self.set_status("Starting scan…")
+            progress = _TkProgressAdapter(self)
+            self.mod_index = scan_mods_folder(mods_folder, progress=progress)
             self.refresh_list()
             total = len(self.mod_index)
             maps = sum(1 for m in self.mod_index.values() if m.is_map)
             valid = sum(1 for m in self.mod_index.values() if m.valid)
-            self.log(f"Found {total} items | valid mods: {valid} | probable maps: {maps}")
+            self.summary_var.set(f"Scan complete: {total} items found | {maps} probable maps | {len(self.savegame_folders)} protected savegame(s)")
+            self.log(f"Found {total} items\nValid mods: {valid}\nProbable maps: {maps}\nProtected savegames: {len(self.savegame_folders)}", clear=True)
+            self.set_status(f"Ready — scanned {total} items.")
         except Exception as exc:
             messagebox.showerror(APP_NAME, str(exc))
+            self.summary_var.set("Scan failed.")
             self.log(traceback.format_exc(), clear=True)
+            self.set_status("Scan failed.")
 
     def refresh_list(self) -> None:
         query = self.filter_var.get().strip().lower()
@@ -528,22 +897,82 @@ class MapCleanerApp:
         mod = self.mod_index.get(selected)
         if not mod:
             return
-        text = [
+        self.summary_var.set(f"Selected: {mod.title or mod.name} ({mod.path.name})")
+        lines = [
             f"Selected: {mod.name}",
             f"Title: {mod.title}",
             f"Path: {mod.path}",
             f"Type: {'Map' if mod.is_map else 'Mod'}",
-            f"Valid: {mod.valid}",
+            f"Valid: {'Yes' if mod.valid else 'No'}",
+            "",
             "Dependencies:",
         ]
         if mod.dependencies:
-            text.extend(f"  - {dep}" for dep in mod.dependencies)
+            lines.extend(f"- {dep}" for dep in mod.dependencies)
         else:
-            text.append("  - none")
+            lines.append("- none")
         if mod.notes:
-            text.append("Notes:")
-            text.extend(f"  - {note}" for note in mod.notes)
-        self.log("\n".join(text), clear=True)
+            lines.append("")
+            lines.append("Notes:")
+            lines.extend(f"- {note}" for note in mod.notes)
+        self.log("\n".join(lines), clear=True)
+        self.set_status(f"Previewing {mod.path.name}")
+
+    def _render_analysis_text(self, result: AnalysisResult) -> None:
+        self.output.configure(state="normal")
+        self.output.delete("1.0", "end")
+        self.output.insert("end", f"Selected map: {result.target_title} ({result.target_name})\n", "h1")
+
+        if result.scanned_savegames:
+            self.output.insert("end", "Protected savegames\n", "h2")
+            for folder in result.scanned_savegames:
+                self.output.insert("end", f"• {folder.name}: {folder}\n", "muted")
+            self.output.insert("end", "\n")
+
+        self.output.insert("end", "Will remove\n", "h2")
+        if result.to_delete:
+            for mod in result.to_delete:
+                prefix = "🗑 " if mod.name == result.target_name else "✓ "
+                self.output.insert("end", f"{prefix}{mod.path.name}\n", "danger" if mod.name == result.target_name else None)
+        else:
+            self.output.insert("end", "Nothing is currently marked for removal.\n", "muted")
+
+        self.output.insert("end", "\nWill keep\n", "h2")
+        if result.kept:
+            for keep in result.kept:
+                self.output.insert("end", f"• {keep.mod.path.name}\n", "ok")
+                if keep.shared_with_mods:
+                    self.output.insert("end", f"  Still used by installed mods/maps: {', '.join(keep.shared_with_mods)}\n", "muted")
+                if keep.shared_with_savegames:
+                    save_parts = []
+                    for save_name, files in keep.shared_with_savegames.items():
+                        sample = ", ".join(files[:2])
+                        if len(files) > 2:
+                            sample += ", …"
+                        save_parts.append(f"{save_name} ({sample})")
+                    self.output.insert("end", f"  Still referenced by savegames: {', '.join(save_parts)}\n", "muted")
+        else:
+            self.output.insert("end", "No shared dependencies were found.\n", "muted")
+
+        if result.missing_dependencies:
+            self.output.insert("end", "\nMissing dependencies\n", "h2")
+            for name in result.missing_dependencies:
+                self.output.insert("end", f"• {name}\n", "warn")
+
+        if result.dependents_on_target:
+            self.output.insert("end", "\nInstalled mods depending on the selected map/mod\n", "h2")
+            for mod in result.dependents_on_target:
+                self.output.insert("end", f"• {mod.name}\n", "warn")
+
+        delete_count = len(result.to_delete)
+        dep_count = max(0, delete_count - 1)
+        self.output.insert("end", "\nSummary\n", "h2")
+        self.output.insert(
+            "end",
+            f"Total files affected: {delete_count} ({'1 map' if delete_count else '0 maps'} + {dep_count} dependency{'ies' if dep_count != 1 else ''})\n",
+            "muted",
+        )
+        self.output.configure(state="disabled")
 
     def analyze_selected(self) -> None:
         selected = self.get_selected_name()
@@ -551,16 +980,18 @@ class MapCleanerApp:
             messagebox.showerror(APP_NAME, "Select a map or mod first.")
             return
         try:
-            self.last_result = analyze_target(selected, self.mod_index)
-            report = format_report(
-                self.last_result,
-                Path(self.mods_folder_var.get().strip()),
-                self.permanent_delete_var.get(),
+            self.set_status("Analyzing selection…")
+            self.last_result = analyze_target(selected, self.mod_index, self.savegame_folders)
+            self.summary_var.set(
+                f"Analysis complete: {len(self.last_result.to_delete)} item(s) would be removed, {len(self.last_result.kept)} item(s) would be kept."
             )
-            self.log(report, clear=True)
+            self._render_analysis_text(self.last_result)
+            self.set_status("Analysis complete.")
         except Exception as exc:
             messagebox.showerror(APP_NAME, str(exc))
             self.log(traceback.format_exc(), clear=True)
+            self.summary_var.set("Analysis failed.")
+            self.set_status("Analysis failed.")
 
     def delete_selected(self) -> None:
         if not self.mod_index:
@@ -572,7 +1003,7 @@ class MapCleanerApp:
             return
 
         try:
-            result = analyze_target(selected, self.mod_index)
+            result = analyze_target(selected, self.mod_index, self.savegame_folders)
             self.last_result = result
         except Exception as exc:
             messagebox.showerror(APP_NAME, str(exc))
@@ -580,26 +1011,32 @@ class MapCleanerApp:
 
         permanent = self.permanent_delete_var.get()
         delete_names = [mod.name for mod in result.to_delete]
-        shared_names = [f"{mod.name} (kept; used by {', '.join(shared)})" for mod, shared in result.kept_shared]
-
         confirm_lines = [
             f"Selected: {result.target_name}",
             "",
             f"This will {'PERMANENTLY DELETE' if permanent else 'MOVE TO QUARANTINE'} {len(delete_names)} item(s):",
-            *[f"- {name}" for name in delete_names[:30]],
         ]
+        confirm_lines.extend(f"- {name}" for name in delete_names[:30])
         if len(delete_names) > 30:
             confirm_lines.append(f"... and {len(delete_names) - 30} more")
-        if shared_names:
-            confirm_lines.extend(["", "These will be kept because they are shared:"])
-            confirm_lines.extend(f"- {line}" for line in shared_names[:20])
-            if len(shared_names) > 20:
-                confirm_lines.append(f"... and {len(shared_names) - 20} more")
+
+        if result.kept:
+            confirm_lines.extend(["", "These will be kept automatically:"])
+            for keep in result.kept[:20]:
+                reason_bits = []
+                if keep.shared_with_mods:
+                    reason_bits.append(f"used by mods/maps: {', '.join(keep.shared_with_mods)}")
+                if keep.shared_with_savegames:
+                    reason_bits.append(f"used by savegames: {', '.join(keep.shared_with_savegames)}")
+                confirm_lines.append(f"- {keep.mod.name} ({' | '.join(reason_bits)})")
+            if len(result.kept) > 20:
+                confirm_lines.append(f"... and {len(result.kept) - 20} more")
+
         if result.dependents_on_target:
             confirm_lines.extend(["", "Warning: installed mods depending on the selected map/mod:"])
             confirm_lines.extend(f"- {mod.name}" for mod in result.dependents_on_target)
-        confirm_lines.extend(["", "Continue?"])
 
+        confirm_lines.extend(["", "Continue?"])
         ok = messagebox.askyesno(APP_NAME, "\n".join(confirm_lines))
         if not ok:
             return
@@ -617,20 +1054,32 @@ class MapCleanerApp:
         except Exception as exc:
             messagebox.showerror(APP_NAME, f"Cleanup failed: {exc}")
             self.log(traceback.format_exc(), clear=True)
+            self.set_status("Cleanup failed.")
             return
 
-        summary = [
-            f"Removed {len(removed)} item(s).",
-            *[f"- {name}" for name in removed],
-        ]
+        summary = [f"Removed {len(removed)} item(s)."]
+        summary.extend(f"- {name}" for name in removed)
         if quarantine_dir:
             summary.extend(["", f"Moved to: {quarantine_dir}"])
         if report_path:
             summary.extend(["", f"Report saved to: {report_path}"])
 
         self.log("\n".join(summary), clear=True)
+        self.summary_var.set(f"Cleanup complete: removed {len(removed)} item(s).")
+        self.set_status("Cleanup complete.")
         messagebox.showinfo(APP_NAME, "\n".join(summary[:20]))
         self.scan()
+
+    def show_about(self) -> None:
+        savegame_line = f"Protected savegames loaded: {len(self.savegame_folders)}"
+        messagebox.showinfo(
+            "About",
+            f"{APP_NAME}\n\n"
+            f"Version: {APP_VERSION}\n"
+            f"Build: {APP_BUILD}\n\n"
+            f"This tool helps remove a selected FS25 map and only the dependency mods that are no longer used by other installed maps/mods or selected savegames.\n\n"
+            f"{savegame_line}",
+        )
 
 
 # -----------------------------
@@ -646,6 +1095,7 @@ def run_cli(argv: List[str]) -> int:
     parser.add_argument("--analyze", action="store_true", help="Analyze only; do not delete")
     parser.add_argument("--delete", action="store_true", help="Delete/remove immediately")
     parser.add_argument("--quarantine", action="store_true", help="Move to quarantine instead of permanent delete")
+    parser.add_argument("--savegame", action="append", default=[], help="Optional savegame folder to protect. Can be used more than once.")
     args = parser.parse_args(argv)
 
     if not args.mods_folder or not args.target:
@@ -655,7 +1105,7 @@ def run_cli(argv: List[str]) -> int:
     mods_folder = Path(args.mods_folder)
     target_name = Path(args.target).stem
     mod_index = scan_mods_folder(mods_folder)
-    result = analyze_target(target_name, mod_index)
+    result = analyze_target(target_name, mod_index, [Path(p) for p in args.savegame])
     report = format_report(result, mods_folder, permanent_delete=not args.quarantine)
     print(report)
 
@@ -678,12 +1128,6 @@ def main() -> int:
         return 1
 
     root = tk.Tk()
-    try:
-        style = ttk.Style(root)
-        if "vista" in style.theme_names():
-            style.theme_use("vista")
-    except Exception:
-        pass
     app = MapCleanerApp(root)
     root.mainloop()
     return 0

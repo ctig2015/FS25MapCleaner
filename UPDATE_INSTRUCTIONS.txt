@@ -1,21 +1,22 @@
-FS25 Map Cleaner update package
+FS25 MAP CLEANER README / DOCS OVERHAUL
+======================================
 
-Copy these files into your existing project folder and replace the old versions:
-- fs25_map_cleaner.py
+This package keeps the v1.1.0 app update and refreshes the documentation so the README explains the interface properly.
+
+Files to replace in your local repo:
 - README.md
 - CHANGELOG.md
 - release_notes_template.md
+- docs/HOW_IT_WORKS.md
+- docs/FAQ.md
 
-Then run:
-- build_local_exe.bat
+You do NOT need to rebuild the EXE just to use this docs update.
 
-Your new EXE will still be named:
-- FS25MapCleaner.exe
+Rebuild only if you also changed app code.
 
-But inside the app it will now show:
-- Version 1.0.1
-- Build 2026-04-09
-
-If you later make another update, only change these values near the top of fs25_map_cleaner.py:
-APP_VERSION = "1.0.1"
-APP_BUILD = "2026-04-09"
+Suggested use:
+1. Unzip this package
+2. Copy the files into your FS25MapCleaner project folder
+3. Replace the old files
+4. Commit and push the updated docs to GitHub
+5. Keep the current EXE unless you also changed code
