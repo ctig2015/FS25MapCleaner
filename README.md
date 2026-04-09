@@ -1,6 +1,6 @@
 # FS25 Map Cleaner
 
-## Download
+## Download.
 
 [![FS25 Map Cleaner banner](assets/fs25-map-cleaner-banner.png)](https://github.com/ctig2015/FS25MapCleaner/releases/latest/download/FS25MapCleaner.exe)
 
