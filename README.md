@@ -8,6 +8,9 @@
 </p>
 =======
 that image is just a concept as well but the app is pretty close the this sill works the same
+
+wee video on how it works https://youtu.be/dlgfQ4HXylU?si=SL0cguXEhs3qlrRL
+
 ## Download.
 >>>>>>> 58bf9e848b08c01e4b41569b8cfda832e8e156dc
 
