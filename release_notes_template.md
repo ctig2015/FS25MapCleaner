@@ -1,24 +1,35 @@
-# FS25 Map Cleaner v1.1.0
+# FS25 Map Cleaner v1.1.1
 
 ## Download
 Download the file below:
 
 **FS25MapCleaner.exe**
 
-## What's new
-- refreshed UI with a cleaner step-by-step layout
+## What's fixed
+This patch fixes the v1.1.0 layout issue where the final remove section was missing in the new interface.
+
+### Fixed
+- restored **Step 4 – Remove Files**
+- restored **Remove Map + Unused Dependencies**
+- restored the visible **Delete permanently** option
+- improved layout so remove controls remain visible on normal window sizes
+
+### Included from v1.1.x
 - optional savegame protection scan
-- selected savegames can now keep dependency mods from being removed if they are still referenced in XML files
-- improved review section with clearer keep/remove explanations
-- improved README with a full guide to each button and section of the app
+- dependency checks against other installed maps and mods
+- protection for dependency mods still referenced by selected savegames
+- clearer review panel before removing files
 
-## Why this update matters
-Some FS25 maps need a lot of extra mods. This update makes it easier and safer to remove a map without removing mods that are still needed by:
-
-- other installed maps or mods
-- another savegame that still uses a related vehicle, placeable, or building
+## How to use
+1. Select your FS25 `mods` folder
+2. Add any savegames you want protected
+3. Click **Scan Mods**
+4. Select the map
+5. Click **Analyze Map**
+6. Review the result
+7. Click **Remove Map + Unused Dependencies**
 
 ## Notes
 - close Farming Simulator 25 before using the app
 - Windows may show a warning because the EXE is not code-signed
-- large mod folders may still take a few seconds to scan
+- savegame protection depends on detectable XML references

@@ -1,17 +1,30 @@
 # FS25 Map Cleaner
 
-## Download.
+<p align="center">
+  <a href="https://github.com/ctig2015/FS25MapCleaner/releases/latest/download/FS25MapCleaner.exe">
+    <img src="assets/fs25-map-cleaner-banner.png" alt="FS25 Map Cleaner" width="900">
+  </a>
+</p>
 
-[![FS25 Map Cleaner banner](assets/fs25-map-cleaner-banner.png)](https://github.com/ctig2015/FS25MapCleaner/releases/latest/download/FS25MapCleaner.exe)
+## Download
 
 [**Download FS25MapCleaner.exe**](https://github.com/ctig2015/FS25MapCleaner/releases/latest/download/FS25MapCleaner.exe)
 
-FS25 Map Cleaner is a Windows tool for **Farming Simulator 25** that helps you remove a map and only the dependency mods that are no longer used by:
+FS25 Map Cleaner is a Windows tool for **Farming Simulator 25** that helps remove a map and only the dependency mods that are no longer used by:
 
 - another installed map or mod
 - a savegame you choose to protect
 
-![FS25 Map Cleaner mockup](assets/ui_mockup_v1_1.png)
+## What's fixed in v1.1.1
+
+This patch restores the missing **Step 4 – Remove Files** section in the new interface.
+
+You now get:
+
+- the full **Remove Map + Unused Dependencies** button back
+- a **Delete permanently** option
+- a cleaner right-side layout where the remove controls stay visible
+- the savegame protection feature from v1.1.0
 
 ## Why this app exists
 
@@ -20,12 +33,12 @@ A lot of FS25 maps need extra packs, placeables, vehicle packs, or other depende
 That becomes a pain when you want to remove one map, because:
 
 - one map can need **10, 20, or more** extra mods
-- some of those same dependency mods may still be used by another map
-- some of them may also still be used in another savegame through vehicles, buildings, or placeables
+- some of those dependency mods may still be used by another map
+- some may also still be used in another savegame through vehicles, buildings, or placeables
 
 FS25 Map Cleaner is designed to make that job easier and safer.
 
-## What the app does
+## How the cleanup works
 
 When you pick a map, the app can:
 
@@ -34,279 +47,110 @@ When you pick a map, the app can:
 3. build the selected map's dependency tree
 4. check whether other installed maps or mods still use those dependencies
 5. optionally scan selected savegames for XML references such as `vehicles.xml` and `placeables.xml`
-6. remove only the selected map plus the dependency mods that are no longer needed anywhere else
+6. remove only the map and the dependency mods that are no longer used anywhere else
 
-## Main idea
+## Step-by-step
 
-The goal is simple:
+### Step 1 – Select FS25 Mods Folder and Optional Savegame Protection
 
-**Remove the map you do not want anymore without removing shared mods that another map, mod, or savegame still needs.**
+This top section is where you tell the app what to scan.
 
----
+**FS25 Mods Folder**
+- Select your main `mods` folder for Farming Simulator 25.
 
-# Interface guide
+**Browse...**
+- Opens a folder picker for your FS25 `mods` folder.
 
-The app is laid out as a simple step-by-step tool.
+**Scan Mods**
+- Scans every ZIP/folder mod in the selected `mods` folder.
+- Reads dependency data from `modDesc.xml`.
+- Builds the list you see in Step 2.
 
-## Step 1 – Select FS25 Mods Folder and Optional Savegame Protection
+**Optional savegame protection**
+- You can add one or more savegame folders before analyzing a map.
+- If a dependency mod is still referenced inside those savegames, the app will keep it.
 
-This section is where you tell the app where your mod files are and which savegames you want to protect.
+**Add Savegame...**
+- Adds a savegame folder to the protected list.
 
-### Mods folder box
-Shows the path to your FS25 `mods` folder.
+**Remove Selected**
+- Removes the highlighted savegame from the protected list.
 
-### Browse…
-Lets you choose the FS25 `mods` folder on your PC.
+**Clear**
+- Clears the protected savegame list.
 
-Use this if your mods are not in the default location or if they are on another drive.
+### Step 2 – Choose Map
 
-### Scan Mods
-Scans the selected mods folder.
+This is where you choose the map or mod you want to remove.
 
-What it does:
-- reads installed ZIP and folder mods
-- loads dependency information
-- identifies probable maps
-- fills the list in Step 2
+**Search box**
+- Filters the list by filename or title.
 
-Use this every time you change the mods folder or add/remove mods.
+**Show maps only**
+- Hides non-map mods so it is easier to find maps.
 
-### Protected savegames list
-Shows the savegame folders you have added for protection scanning.
+**Mods list**
+- Shows the filename, type, dependency count, and title.
 
-If a dependency mod appears to be used in one of these savegames, the app will keep it instead of removing it.
+**Analyze Map**
+- Checks the selected map or mod.
+- Builds the dependency tree.
+- Compares it against other installed mods/maps.
+- Checks selected savegames if you added any.
+- Shows what will be removed and what will be kept.
 
-### Add Savegame…
-Lets you add a savegame folder to protect.
+### Step 3 – Review Results
 
-Use this when:
-- you want to remove one map
-- but another save may still use vehicles, buildings, placeables, or other content from one of that map's dependency mods
+This section explains what the cleanup would do before anything is deleted.
 
-### Remove Selected
-Removes the highlighted savegame from the protection list.
-
-It does **not** delete the savegame itself. It only removes it from the app's protection scan list.
-
-### Clear
-Clears the whole savegame protection list.
-
-This does **not** delete any savegames. It only turns off savegame protection until you add folders again.
-
----
-
-## Step 2 – Choose Map
-
-This section is where you choose what you want to remove.
-
-### Search maps/mods
-Filters the list to help you find a map or mod faster.
-
-### Show maps only
-Shows only probable maps in the list.
-
-This is useful when your mods folder contains a lot of non-map mods and you only want to pick from maps.
-
-### Map list columns
-
-- **Filename** = the ZIP or folder name
-- **Type** = whether the item looks like a map or a normal mod
-- **Deps** = how many direct dependencies were found
-- **Title** = the detected display title if available
-
-### Analyze Map
-Analyzes the selected item.
-
-What it does:
-- builds the dependency tree for the selected map/mod
-- checks whether dependencies are shared by other installed mods/maps
-- checks selected savegames for XML references
-- prepares a keep/remove summary in Step 3
-
-Use this before deleting anything.
-
----
-
-## Step 3 – Review Results
-
-This section is the safety check.
-
-It tells you exactly what the app plans to remove and what it plans to keep.
-
-### Selected map
-Shows the item currently being analyzed.
-
-### Will remove
-These are the files the app believes are safe to remove.
-
-That usually includes:
+The review panel shows:
 - the selected map
-- dependency mods that are not used by anything else
+- what will be removed
+- what will be kept
+- why shared or savegame-used dependencies are protected
 
-### Will keep
-These are dependency mods that the app detected are still needed.
+Use this section to confirm the result looks correct before clicking the remove button.
 
-Reasons include:
-- another installed map or mod still depends on them
-- a selected savegame still appears to reference them
+### Step 4 – Remove Files
 
-### Reason box
-Explains **why** something is being kept.
+This is the final action section.
 
-This is important because it helps you understand whether a dependency is shared or savegame-protected.
+**Delete permanently (skip quarantine)**
+- Deletes files directly instead of moving them into the app's quarantine folder.
+- Leave this unticked if you want the safer option.
 
-### Total files affected
-Shows how many files the app plans to remove.
+**Remove Map + Unused Dependencies**
+- Removes the selected map
+- Removes only the dependency mods that are not used by:
+  - another installed map or mod
+  - any selected protected savegame
 
-Use this as a final quick check before pressing the delete button.
+**About**
+- Shows the current version and build.
 
----
+## Safe use guide
 
-## Step 4 – Remove Files
+1. Close Farming Simulator 25
+2. Pick your `mods` folder
+3. Add any savegames you want protected
+4. Click **Scan Mods**
+5. Pick the map you want to remove
+6. Click **Analyze Map**
+7. Read the review panel carefully
+8. Click **Remove Map + Unused Dependencies** only if the result looks right
 
-This section controls how the actual removal works.
+## Notes
 
-### Delete permanently
-When ticked, files are deleted directly instead of being moved to quarantine.
+- This tool depends on installed mod dependency metadata and detectable savegame XML references.
+- If a mod author did not declare dependencies correctly, no tool can guarantee a perfect result.
+- Large mod folders can take a few seconds to scan.
+- Windows may show a warning because the EXE is not code-signed.
 
-Use permanent delete only if you are sure.
+## Feedback
 
-If you want a safer workflow, leave permanent delete off so you can review removed files later.
-
-### Remove Map + Unused Dependencies
-This is the main action button.
-
-It removes:
-- the selected map
-- dependency mods that are no longer needed by another installed map/mod
-- dependency mods that are not protected by the selected savegame scan
-
-It does **not** remove:
-- shared dependencies still used somewhere else
-- dependencies still referenced by protected savegames
-
-### About
-Shows the app version and build number.
-
-Useful when reporting bugs or checking which build you are using.
-
----
-
-## Bottom status area
-
-The bottom of the app shows current status information.
-
-Examples:
-- ready
-- scanning mods
-- scan complete
-- analysis complete
-
-The bottom-right corner also shows the current app version and build.
-
----
-
-# Recommended way to use it
-
-1. Close **Farming Simulator 25**
-2. Open **FS25MapCleaner.exe**
-3. Click **Browse…** and select your FS25 `mods` folder
-4. Add any savegames you want protected using **Add Savegame…**
-5. Click **Scan Mods**
-6. Tick **Show maps only** if you only want to see maps
-7. Select the map you want to remove
-8. Click **Analyze Map**
-9. Read the **Will remove** and **Will keep** sections carefully
-10. Decide whether to use **Delete permanently**
-11. Click **Remove Map + Unused Dependencies**
-
----
-
-# Savegame protection explained
-
-This is one of the most useful features in the app.
-
-Example:
-
-- Map A needed a vehicle pack and a placeable pack
-- you now want to remove Map A
-- but Savegame B still uses a shed, trailer, or other item from one of those packs
-
-Without savegame protection, you might accidentally remove a mod that another save still needs.
-
-With savegame protection turned on, the app scans selected savegames for XML references and keeps dependency mods that still look in use.
-
-## Files the app may check in savegames
-
-Examples include:
-- `vehicles.xml`
-- `placeables.xml`
-- other XML files inside the selected savegame folder
-
-This is a **best-effort safety feature**, not a perfect guarantee, but it is much safer than removing everything blindly.
-
----
-
-# What the app keeps automatically
-
-A dependency is kept when the app detects that it is still needed by:
-
-- another installed map
-- another installed mod
-- a protected savegame you selected
-
----
-
-# What the app removes
-
-A dependency is removed only when the app believes it is **not** still used by:
-
-- another installed map
-- another installed mod
-- a selected protected savegame
-
----
-
-# Important notes
-
-- Close Farming Simulator 25 before using the app
-- The app works best when mod authors have declared dependencies correctly in `modDesc.xml`
-- Savegame protection is based on XML references the app can detect
-- Windows may show a warning because the EXE is not code-signed
-- Large mod folders can take a little time to scan
-
----
-
-# Good reasons to use this app
-
-This tool is especially useful if you:
-
-- test a lot of maps
-- swap maps often
-- have a huge mods folder
-- want to clean up old map dependencies safely
-- have saves that still use content from dependency packs
-
----
-
-# Feedback and support
-
-If something does not look right, please report it.
-
-- [Open an Issue](https://github.com/ctig2015/FS25MapCleaner/issues) for bugs, crashes, wrong delete results, or dependency mistakes
-- [Join Discussions](https://github.com/ctig2015/FS25MapCleaner/discussions) for ideas, suggestions, and test feedback
-
-Helpful feedback includes:
-- the map name
-- approximate number of mods in the folder
-- whether savegame protection was on or off
-- what the app said it would remove
-- what happened after removal
-- screenshots if possible
-
----
-
-# Current version
-
-**Version 1.1.0**  
-**Build 2026-04-09**
+If you test the app, please report:
+- map name
+- approximate mod count
+- whether the keep/remove result was correct
+- whether savegame protection worked
+- any crashes, freezes, or scan issues

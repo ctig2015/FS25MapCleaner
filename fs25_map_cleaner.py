@@ -24,7 +24,7 @@ except Exception:  # pragma: no cover
     tkfont = None
 
 APP_NAME = "FS25 Map Cleaner"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.1.1"
 APP_BUILD = "2026-04-09"
 APP_SUBTITLE = "Remove a map and only the dependency mods no other installed map or save still uses."
 
@@ -519,8 +519,8 @@ class MapCleanerApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title(f"{APP_NAME} v{APP_VERSION}")
-        self.root.geometry("1420x880")
-        self.root.minsize(1180, 760)
+        self.root.geometry("1460x940")
+        self.root.minsize(1240, 840)
         self.root.configure(bg=BG)
         try_set_icon(root)
 
@@ -578,9 +578,15 @@ class MapCleanerApp:
         middle.rowconfigure(0, weight=1)
 
         self._build_step2(middle)
-        self._build_step3(middle)
 
-        self._build_step4(outer)
+        right_col = tk.Frame(middle, bg=BG)
+        right_col.grid(row=0, column=1, sticky="nsew")
+        right_col.columnconfigure(0, weight=1)
+        right_col.rowconfigure(0, weight=1)
+
+        self._build_step3(right_col)
+        self._build_step4(right_col)
+
         self._build_status_bar(outer)
 
     def _build_header(self, parent: tk.Widget) -> None:
@@ -589,11 +595,22 @@ class MapCleanerApp:
 
         title_row = tk.Frame(header, bg=HEADER_BG, padx=16, pady=14)
         title_row.pack(fill="x")
-        tk.Label(title_row, text="🪶", bg=HEADER_BG, fg=ACCENT, font=("Segoe UI Emoji", 22)).pack(side="left", padx=(0, 10))
+
+        badge = tk.Label(
+            title_row,
+            text="FS25",
+            bg=ACCENT,
+            fg="white",
+            font=("Segoe UI", 11, "bold"),
+            padx=10,
+            pady=6,
+        )
+        badge.pack(side="left", padx=(0, 12))
+
         text_col = tk.Frame(title_row, bg=HEADER_BG)
         text_col.pack(side="left", fill="x", expand=True)
         tk.Label(text_col, text=APP_NAME, bg=HEADER_BG, fg=TEXT, font=("Segoe UI", 24, "bold")).pack(anchor="w")
-        tk.Label(text_col, text=APP_SUBTITLE, bg=HEADER_BG, fg=MUTED, font=("Segoe UI", 12)).pack(anchor="w", pady=(4, 0))
+        tk.Label(text_col, text=APP_SUBTITLE, bg=HEADER_BG, fg=MUTED, font=("Segoe UI", 12), wraplength=980, justify="left").pack(anchor="w", pady=(4, 0))
         tk.Label(
             title_row,
             text=f"Version {APP_VERSION} | Build {APP_BUILD}",
@@ -702,13 +719,20 @@ class MapCleanerApp:
 
     def _build_step3(self, parent: tk.Widget) -> None:
         card, body = make_card(parent, "Step 3 – Review Results")
-        card.grid(row=0, column=1, sticky="nsew")
+        card.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
         body.rowconfigure(1, weight=1)
         body.columnconfigure(0, weight=1)
 
-        tk.Label(body, textvariable=self.summary_var, bg=CARD_BG, fg=TEXT, justify="left", anchor="w", wraplength=560, font=("Segoe UI", 11, "bold")).grid(
-            row=0, column=0, sticky="ew", pady=(0, 8)
-        )
+        tk.Label(
+            body,
+            textvariable=self.summary_var,
+            bg=CARD_BG,
+            fg=TEXT,
+            justify="left",
+            anchor="w",
+            wraplength=560,
+            font=("Segoe UI", 11, "bold"),
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
 
         output_wrap = tk.Frame(body, bg="#fdfefe", bd=1, relief="solid")
         output_wrap.grid(row=1, column=0, sticky="nsew")
@@ -739,12 +763,11 @@ class MapCleanerApp:
 
     def _build_step4(self, parent: tk.Widget) -> None:
         card, body = make_card(parent, "Step 4 – Remove Files")
-        card.pack(fill="x")
+        card.grid(row=1, column=0, sticky="ew")
+        body.columnconfigure(0, weight=1)
 
-        top_row = tk.Frame(body, bg=CARD_BG)
-        top_row.pack(fill="x")
         tk.Checkbutton(
-            top_row,
+            body,
             text="Delete permanently (skip quarantine)",
             variable=self.permanent_delete_var,
             bg=CARD_BG,
@@ -753,31 +776,45 @@ class MapCleanerApp:
             activeforeground=TEXT,
             selectcolor="white",
             font=("Segoe UI", 10),
-        ).pack(side="left")
+        ).grid(row=0, column=0, sticky="w")
+
         tk.Label(
-            top_row,
-            text="Shared dependencies and savegame-used mods are kept automatically.",
+            body,
+            text="Shared dependencies and savegame-used mods are kept automatically, even when permanent delete is enabled.",
             bg=CARD_BG,
             fg=MUTED,
             font=("Segoe UI", 10),
-        ).pack(side="left", padx=(16, 0))
+            wraplength=560,
+            justify="left",
+        ).grid(row=1, column=0, sticky="w", pady=(8, 0))
 
         danger_row = tk.Frame(body, bg=CARD_BG)
-        danger_row.pack(fill="x", pady=(12, 0))
+        danger_row.grid(row=2, column=0, sticky="ew", pady=(12, 0))
+        danger_row.columnconfigure(0, weight=1)
+
+        ttk.Button(danger_row, text="About", style="Secondary.TButton", command=self.show_about).grid(row=0, column=0, sticky="w")
         self.delete_button = ttk.Button(
             danger_row,
             text="Remove Map + Unused Dependencies",
             style="Danger.TButton",
             command=self.delete_selected,
         )
-        self.delete_button.pack(side="right")
-        ttk.Button(danger_row, text="About", style="Secondary.TButton", command=self.show_about).pack(side="right", padx=(0, 10))
+        self.delete_button.grid(row=0, column=1, sticky="e")
+        self._set_delete_enabled(False)
 
     def _build_status_bar(self, parent: tk.Widget) -> None:
         bar = tk.Frame(parent, bg=HEADER_BG, bd=1, relief="solid", padx=12, pady=8)
-        bar.pack(fill="x", pady=(12, 0))
+        bar.pack(fill="x", pady=(0, 0))
         tk.Label(bar, textvariable=self.status_var, bg=HEADER_BG, fg=SUCCESS, font=("Segoe UI", 11, "bold")).pack(side="left")
         tk.Label(bar, text=f"Version {APP_VERSION} | Build {APP_BUILD}", bg=HEADER_BG, fg=MUTED, font=("Segoe UI", 10)).pack(side="right")
+
+    def _set_delete_enabled(self, enabled: bool) -> None:
+        if not hasattr(self, "delete_button"):
+            return
+        if enabled:
+            self.delete_button.state(["!disabled"])
+        else:
+            self.delete_button.state(["disabled"])
 
     def set_status(self, text: str) -> None:
         self.status_var.set(text)
@@ -797,6 +834,7 @@ class MapCleanerApp:
 
     def render_welcome(self) -> None:
         self.summary_var.set("Select your FS25 mods folder, scan it, pick a map, then analyze the result.")
+        self._set_delete_enabled(False)
         self.output.configure(state="normal")
         self.output.delete("1.0", "end")
         self.output.insert("end", "FS25 Map Cleaner\n", "h1")
@@ -807,7 +845,7 @@ class MapCleanerApp:
         self.output.insert("end", "• Keeps dependencies used by other installed maps or mods\n")
         self.output.insert("end", "• Optionally scans selected savegames and keeps mods still referenced there\n\n")
         self.output.insert("end", "Suggested flow\n", "h2")
-        self.output.insert("end", "1. Pick your FS25 mods folder\n2. Add any savegames you want protected\n3. Scan mods\n4. Select the map\n5. Analyze the result\n6. Remove only what is no longer needed\n", "muted")
+        self.output.insert("end", "1. Pick your FS25 mods folder\n2. Add any savegames you want protected\n3. Scan mods\n4. Select the map\n5. Analyze the result\n6. Click Remove Map + Unused Dependencies only after checking the review panel\n", "muted")
         self.output.configure(state="disabled")
 
     def pick_mods_folder(self) -> None:
@@ -848,6 +886,7 @@ class MapCleanerApp:
         mods_folder = Path(folder_text)
         try:
             self.last_result = None
+            self._set_delete_enabled(False)
             self.summary_var.set("Scanning mods folder…")
             self.clear_output()
             self.set_status("Starting scan…")
@@ -892,6 +931,7 @@ class MapCleanerApp:
 
     def preview_selected(self) -> None:
         selected = self.get_selected_name()
+        self._set_delete_enabled(False)
         if not selected:
             return
         mod = self.mod_index.get(selected)
@@ -986,9 +1026,11 @@ class MapCleanerApp:
                 f"Analysis complete: {len(self.last_result.to_delete)} item(s) would be removed, {len(self.last_result.kept)} item(s) would be kept."
             )
             self._render_analysis_text(self.last_result)
+            self._set_delete_enabled(True)
             self.set_status("Analysis complete.")
         except Exception as exc:
             messagebox.showerror(APP_NAME, str(exc))
+            self._set_delete_enabled(False)
             self.log(traceback.format_exc(), clear=True)
             self.summary_var.set("Analysis failed.")
             self.set_status("Analysis failed.")
